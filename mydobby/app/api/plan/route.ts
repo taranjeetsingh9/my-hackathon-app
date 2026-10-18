@@ -1,3 +1,16 @@
+import { readFileSync } from "fs";
+
+const demoPlanResponse = JSON.parse(
+  readFileSync(new URL("../../data/demo-ai-response.json", import.meta.url), "utf8"),
+) as {
+  nextStep: string;
+  why: string;
+  priority: string;
+  currentLoad: string;
+  plan: string;
+  source: string;
+};
+
 export async function POST(request: Request) {
   const { mindDump = "", goal = "", time = "20 min", energy = "medium" } = await request.json();
 
@@ -6,7 +19,15 @@ export async function POST(request: Request) {
   const openAiKey = process.env.OPENAI_API_KEY;
 
   if (!geminiKey && !openAiKey) {
-    return Response.json({ ...fallback, source: "demo" });
+    return Response.json({
+      ...demoPlanResponse,
+      nextStep: fallback.nextStep,
+      why: fallback.why,
+      priority: fallback.priority,
+      currentLoad: fallback.currentLoad,
+      plan: fallback.plan,
+      source: "demo",
+    });
   }
 
   try {
@@ -99,10 +120,26 @@ export async function POST(request: Request) {
       }
     }
   } catch {
-    return Response.json({ ...fallback, source: "demo" });
+    return Response.json({
+      ...demoPlanResponse,
+      nextStep: fallback.nextStep,
+      why: fallback.why,
+      priority: fallback.priority,
+      currentLoad: fallback.currentLoad,
+      plan: fallback.plan,
+      source: "demo",
+    });
   }
 
-  return Response.json({ ...fallback, source: "demo" });
+  return Response.json({
+    ...demoPlanResponse,
+    nextStep: fallback.nextStep,
+    why: fallback.why,
+    priority: fallback.priority,
+    currentLoad: fallback.currentLoad,
+    plan: fallback.plan,
+    source: "demo",
+  });
 }
 
 function buildFallbackPlan(mindDump: string, goal: string, time: string, energy: string) {

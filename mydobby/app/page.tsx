@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import confetti from "canvas-confetti";
 import Messenger3D, { MessengerType } from "./components/Messenger3D";
 import { supabase } from "../lib/supabase";
@@ -129,6 +129,8 @@ export default function Home() {
   } | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [stepReason, setStepReason] = useState("");
+  const [checkInNote, setCheckInNote] = useState("");
+  const hasHydratedRef = useRef(false);
   const [aiPlan, setAiPlan] = useState<{
     nextStep?: string;
     why?: string;
@@ -178,7 +180,7 @@ export default function Home() {
       if (profile) {
         const loadedMindDump = profile.mind_dump ?? profile.current_mind_dump;
         if (loadedMindDump !== undefined && loadedMindDump !== null) {
-          setMindDump(loadedMindDump);
+          setMindDump((prev) => (prev ? prev : loadedMindDump));
         }
         const loadedTime = profile.time_budget ?? profile.current_time;
         if (loadedTime) setTime(loadedTime as TimeOption);
@@ -186,22 +188,21 @@ export default function Home() {
         if (loadedEnergy) setEnergy(loadedEnergy as EnergyLevel);
         const loadedGoal = profile.goal ?? profile.current_goal;
         if (loadedGoal !== undefined && loadedGoal !== null) {
-          setGoal(loadedGoal);
+          setGoal((prev) => (prev ? prev : loadedGoal));
         }
         if (profile.messenger) setMessenger(profile.messenger as MessengerType);
-        if (loadedMindDump || loadedGoal) {
-          setScreen("step");
-        }
+        // Only advance screen if user is currently on the welcome screen
+        setScreen((prev) => (prev === "welcome" && (loadedMindDump || loadedGoal) ? "step" : prev));
       } else {
         // Initialize profile row in Supabase
         const { error: insErr } = await supabase.from("profiles").upsert({
           id: currentUser.id,
           email: currentUser.email,
-          mind_dump: mindDump || "",
-          time_budget: time,
-          energy_level: energy,
-          goal: goal || "",
-          messenger: messenger,
+          mind_dump: "",
+          time_budget: "20 min",
+          energy_level: "medium",
+          goal: "",
+          messenger: "Owl",
           updated_at: new Date().toISOString(),
         });
         if (insErr) {
@@ -258,7 +259,7 @@ export default function Home() {
     } finally {
       setIsSyncing(false);
     }
-  }, [mindDump, time, energy, goal, messenger]);
+  }, []);
 
   // Sync profile edits (mindDump, time, energy, goal, messenger) to Supabase
   const syncProfileToSupabase = async (overrides?: {
@@ -408,24 +409,28 @@ export default function Home() {
     setAuthNotice({ text: "Logged out. You are now using Guest Mode (Local storage)." });
   };
 
-  // Local storage backup for guest users only
+  // Local storage backup for guest users only (hydrates once on mount)
   useEffect(() => {
-    if (user) return; // Don't use guest local storage when authenticated
+    if (user || hasHydratedRef.current) return;
+    hasHydratedRef.current = true;
     const saved = window.localStorage.getItem("mydobby-state");
     if (!saved) return;
 
     try {
       const parsed = JSON.parse(saved);
-      setMindDump(parsed.mindDump ?? "");
-      setTime(parsed.time ?? "20 min");
-      setEnergy(parsed.energy ?? "medium");
-      setGoal(parsed.goal ?? "");
-      setMessenger(parsed.messenger ?? "Owl");
-      setHistory(parsed.history ?? []);
-      setLetters(parsed.letters ?? []);
-      if (parsed.mindDump || parsed.goal || parsed.history?.length) {
-        setScreen("step");
-      }
+      if (parsed.mindDump) setMindDump((prev) => (prev ? prev : parsed.mindDump));
+      if (parsed.time) setTime(parsed.time);
+      if (parsed.energy) setEnergy(parsed.energy);
+      if (parsed.goal) setGoal((prev) => (prev ? prev : parsed.goal));
+      if (parsed.messenger) setMessenger(parsed.messenger);
+      if (parsed.history) setHistory(parsed.history);
+      if (parsed.letters) setLetters(parsed.letters);
+      // Only advance screen if user is still on the welcome screen
+      setScreen((prev) =>
+        prev === "welcome" && (parsed.mindDump || parsed.goal || parsed.history?.length)
+          ? "step"
+          : prev
+      );
     } catch {
       // ignore malformed storage and continue
     }
@@ -486,8 +491,8 @@ export default function Home() {
   const recommendedStep = isLoadingStep ? "Generating your next gentle step with Groq AI..." : activeNextStep;
 
   // Add Action Result & Save to Supabase check_ins
-  const addHistoryItem = async (status: Status) => {
-    const title = goal || "General momentum";
+  const addHistoryItem = async (status: Status, customTitle?: string) => {
+    const title = customTitle?.trim() || checkInNote.trim() || goal || activeNextStep || "General momentum";
     const date = new Date().toLocaleDateString();
     const tempId = Date.now();
 
@@ -511,6 +516,7 @@ export default function Home() {
       }
     }
 
+    setCheckInNote("");
     setHistory((prev) => [item, ...prev]);
 
     // Save to Supabase if authenticated
@@ -734,10 +740,11 @@ export default function Home() {
           <p className="mt-4 max-w-xl text-lg leading-8 text-[#5d5669]">
             Unload the noise in your head, notice the real energy in your day, and let Mydobby turn it into one gentle action you can actually finish.
           </p>
+
           <div className="mt-8 flex flex-wrap gap-3">
             <button
               onClick={startNewCheckIn}
-              className="rounded-full bg-[linear-gradient(135deg,#d9c8f4,#cfeee3)] px-6 py-3 text-base font-semibold text-[#2a2340] shadow-[0_14px_30px_rgba(183,154,220,0.28)] transition-transform duration-200 hover:-translate-y-0.5"
+              className="rounded-full bg-[linear-gradient(135deg,#d9c8f4,#cfeee3)] px-6 py-3 text-base font-semibold text-[#2a2340] shadow-[0_14px_30px_rgba(183,154,220,0.28)] transition-transform duration-200 hover:-translate-y-0.5 active:scale-95"
             >
               🌿 Start check-in
             </button>
@@ -771,30 +778,58 @@ export default function Home() {
 
   const renderMind = () => (
     <div className="mx-auto w-full max-w-2xl rounded-[32px] border border-white/70 bg-white/80 p-8 shadow-[0_18px_60px_rgba(126,109,134,0.12)] backdrop-blur-sm">
-      <p className="text-sm uppercase tracking-[0.15em] text-[#7b6894]">1 / 4</p>
+      <p className="text-sm uppercase tracking-[0.15em] text-[#7b6894]">1 / 4 • Check-in</p>
       <h2 className="mt-3 text-3xl font-semibold text-[#2f2a36]">What is on your mind right now?</h2>
+      <p className="mt-2 text-sm text-[#665a77]">
+        Unload whatever thoughts, worries, tasks, or pressure feel loud. Type freely below:
+      </p>
 
-      <div className="mt-5 flex flex-wrap gap-2">
-        {demoThoughts.map((example) => (
+      <div className="mt-5 flex flex-wrap items-center gap-2">
+        <span className="text-xs text-[#7a6d8d] font-medium mr-1">Quick examples:</span>
+        {[
+          { label: "💡 Work Overwhelm", text: demoThoughts[0] },
+          { label: "🌿 Exercise & Routine", text: demoThoughts[1] },
+          { label: "🎯 Project Focus", text: demoThoughts[2] },
+        ].map((item) => (
           <button
-            key={example}
-            onClick={() => setMindDump(example)}
-            className="rounded-full border border-[#eadff8] bg-[#faf6ff] px-3 py-1.5 text-xs text-[#4d4360] transition hover:bg-[#f3ebff]"
+            key={item.label}
+            type="button"
+            onClick={() => setMindDump(item.text)}
+            className="rounded-full border border-[#eadff8] bg-[#faf6ff] px-3 py-1.5 text-xs text-[#4d4360] transition hover:bg-[#f3ebff] active:scale-95"
           >
-            Try example
+            {item.label}
           </button>
         ))}
+        {mindDump && (
+          <button
+            type="button"
+            onClick={() => setMindDump("")}
+            className="rounded-full border border-rose-200 bg-rose-50 px-2.5 py-1 text-xs text-rose-700 hover:bg-rose-100 transition"
+          >
+            ✕ Clear
+          </button>
+        )}
       </div>
 
-      <textarea
-        value={mindDump}
-        onChange={(event) => setMindDump(event.target.value)}
-        rows={7}
-        className="mt-6 w-full rounded-3xl border border-[#e7dff6] bg-[#fffdfd] p-4 text-base text-[#2f2a36] outline-none ring-0 placeholder:text-[#948ca2] focus:border-[#d1b8f3]"
-        placeholder="Write your thoughts, worries, tasks, or plans here. Example: I feel behind on my portfolio and I only have 20 minutes today."
-      />
+      <div className="relative mt-5">
+        <textarea
+          autoFocus
+          value={mindDump}
+          onChange={(event) => setMindDump(event.target.value)}
+          rows={7}
+          className="w-full rounded-3xl border border-[#e7dff6] bg-[#fffdfd] p-4 text-base text-[#2f2a36] outline-none ring-0 placeholder:text-[#948ca2] focus:border-[#c5a9eb] focus:ring-2 focus:ring-[#f1e6ff] transition"
+          placeholder="Write your thoughts, worries, tasks, or plans here. Example: I feel behind on my portfolio and I only have 20 minutes today."
+        />
+        <div className="mt-2 flex items-center justify-between text-xs text-[#877899] px-2">
+          <span>
+            {mindDump.trim() ? mindDump.trim().split(/\s+/).length : 0} words • {mindDump.length} characters
+          </span>
+          {mindDump.trim() && <span className="text-emerald-700 font-medium">✓ Ready to continue</span>}
+        </div>
+      </div>
+
       <div className="mt-6 flex justify-between gap-3">
-        <button onClick={() => setScreen("welcome")} className="rounded-full border border-[#eadff8] px-4 py-2 text-[#3f3950]">
+        <button onClick={() => setScreen("welcome")} className="rounded-full border border-[#eadff8] px-4 py-2 text-[#3f3950] hover:bg-[#faf6ff]">
           Back
         </button>
         <button
@@ -802,10 +837,10 @@ export default function Home() {
             syncProfileToSupabase({ mindDump });
             setScreen("energy");
           }}
-          className="rounded-full bg-[#d7f0e2] px-5 py-2.5 font-medium text-[#1d3b2d]"
+          className="rounded-full bg-[#d7f0e2] px-6 py-2.5 font-medium text-[#1d3b2d] shadow-sm transition hover:bg-[#cbf0d9] disabled:opacity-50 disabled:cursor-not-allowed"
           disabled={!mindDump.trim()}
         >
-          Continue
+          Continue to Capacity →
         </button>
       </div>
     </div>
@@ -871,15 +906,16 @@ export default function Home() {
     <div className="mx-auto w-full max-w-2xl rounded-[32px] border border-white/70 bg-white/80 p-8 shadow-[0_18px_60px_rgba(126,109,134,0.12)] backdrop-blur-sm">
       <p className="text-sm uppercase tracking-[0.15em] text-[#7b6894]">3 / 4</p>
       <h2 className="mt-3 text-3xl font-semibold text-[#2f2a36]">Do you want to choose a goal right now?</h2>
-      <p className="mt-2 text-[#5f5868]">You can skip this and just let Mybee help you with the next small step.</p>
+      <p className="mt-2 text-[#5f5868]">You can skip this and just let Mydobby help you with the next small step.</p>
       <input
+        autoFocus
         value={goal}
         onChange={(event) => setGoal(event.target.value)}
-        className="mt-6 w-full rounded-3xl border border-[#e7dff6] bg-[#fffdfd] p-4 text-base text-[#2f2a36] outline-none placeholder:text-[#948ca2] focus:border-[#d1b8f3]"
+        className="mt-6 w-full rounded-3xl border border-[#e7dff6] bg-[#fffdfd] p-4 text-base text-[#2f2a36] outline-none placeholder:text-[#948ca2] focus:border-[#d1b8f3] focus:ring-2 focus:ring-[#f1e6ff] transition"
         placeholder="Examples: finish my portfolio, call my family, prepare my first draft"
       />
       <div className="mt-7 flex justify-between gap-3">
-        <button onClick={() => setScreen("energy")} className="rounded-full border border-[#eadff8] px-4 py-2 text-[#3f3950]">
+        <button onClick={() => setScreen("energy")} className="rounded-full border border-[#eadff8] px-4 py-2 text-[#3f3950] hover:bg-[#faf6ff]">
           Back
         </button>
         <button
@@ -887,7 +923,7 @@ export default function Home() {
             syncProfileToSupabase({ goal });
             setScreen("step");
           }}
-          className="rounded-full bg-[#d9c8f4] px-5 py-2.5 font-medium text-[#2a2340]"
+          className="rounded-full bg-[#d9c8f4] px-5 py-2.5 font-medium text-[#2a2340] hover:bg-[#cfbcee]"
         >
           {goal ? "Use this goal" : "Skip for now"}
         </button>
@@ -904,7 +940,7 @@ export default function Home() {
         </div>
         <button
           onClick={() => setScreen("letters")}
-          className="rounded-full border border-[#e6ddf8] bg-[#f7f4fe] px-4 py-2 text-sm font-medium text-[#43396a]"
+          className="rounded-full border border-[#e6ddf8] bg-[#f7f4fe] px-4 py-2 text-sm font-medium text-[#43396a] hover:bg-[#f1e9fd]"
         >
           View letters
         </button>
@@ -936,20 +972,38 @@ export default function Home() {
         </div>
       </div>
 
-      <div className="mt-8 grid gap-4 md:grid-cols-4">
+      {/* Check-in Reflection & Title */}
+      <div className="mt-8 rounded-[24px] border border-[#ebdff8] bg-[#faf6ff] p-5 shadow-xs">
+        <label htmlFor="checkin-note-input" className="block text-xs font-semibold uppercase tracking-[0.14em] text-[#6b5883]">
+          Check-in Note or Action Title (optional)
+        </label>
+        <p className="mt-1 text-xs text-[#736585]">
+          Type a reflection on what you did, or leave blank to record the recommended step:
+        </p>
+        <input
+          id="checkin-note-input"
+          type="text"
+          value={checkInNote}
+          onChange={(e) => setCheckInNote(e.target.value)}
+          placeholder={`e.g. ${goal || activeNextStep || "Did my focused session"}`}
+          className="mt-3 w-full rounded-2xl border border-[#ded0ed] bg-white p-3.5 text-sm text-[#2f2a36] outline-none placeholder:text-[#9c90ae] focus:border-[#b89fe0] focus:ring-2 focus:ring-[#ede2fa] transition"
+        />
+      </div>
+
+      <div className="mt-5 grid gap-4 sm:grid-cols-2 md:grid-cols-4">
         {[
-          { label: "I did it", value: "done" },
-          { label: "Partially", value: "partial" },
-          { label: "Changed plan", value: "changed" },
-          { label: "Skip for now", value: "skipped" },
+          { label: "✓ I did it", value: "done", color: "hover:bg-[#ebf8f0] hover:border-[#bde3cb]" },
+          { label: "⏳ Partially", value: "partial", color: "hover:bg-[#fbf4eb] hover:border-[#ebdcc3]" },
+          { label: "🔄 Changed plan", value: "changed", color: "hover:bg-[#f7f0fe] hover:border-[#dcceef]" },
+          { label: "⏭ Skip for now", value: "skipped", color: "hover:bg-slate-50 hover:border-slate-200" },
         ].map((action) => (
           <button
             key={action.value}
             onClick={() => {
-              addHistoryItem(action.value as Status);
+              addHistoryItem(action.value as Status, checkInNote);
               setScreen("letters");
             }}
-            className="rounded-2xl border border-[#eadff8] bg-white px-4 py-3 text-sm font-medium text-[#3c3450] transition hover:bg-[#faf6ff]"
+            className={`rounded-2xl border border-[#eadff8] bg-white px-4 py-3 text-sm font-medium text-[#3c3450] transition ${action.color}`}
           >
             {action.label}
           </button>

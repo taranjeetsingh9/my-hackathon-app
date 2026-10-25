@@ -3,7 +3,7 @@ doc: scope
 status: approved
 ---
 
-# Mydobby
+# Kokoro (formerly Mydobby)
 
 A calm, pastel companion web app that transforms mental overwhelm into one kind, realistic next action and returns your progress as heartfelt future-self reflection letters delivered by interactive 3D animal messengers.
 

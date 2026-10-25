@@ -12,7 +12,7 @@ export async function POST(request: Request) {
     const groqKey = process.env.GROQ_API_KEY;
 
     if (groqKey) {
-      const systemPrompt = `You are Mydobby, an empathetic, perceptive, and gentle AI companion inspired by the philosophy of Ikigai.
+      const systemPrompt = `You are Kokoro, an empathetic, perceptive, and gentle AI companion inspired by the philosophy of Ikigai.
 Your mission is to help overwhelmed people transform mental clutter into one kind, realistic, and visible next action that fits their actual time and energy.
 Do NOT give them a huge list. Focus on ONE concrete next step.
 

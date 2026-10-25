@@ -3,9 +3,9 @@ doc: prd
 status: approved
 ---
 
-# Mydobby — Product Requirements Document
+# Kokoro (formerly Mydobby) — Product Requirements Document
 
-Mydobby is a calm, pastel web app that helps overwhelmed people convert chaotic thoughts into one realistic next action and reflect upon their personal growth through future-self letters and 3D messengers.
+Kokoro is a calm, pastel web app that helps overwhelmed people convert chaotic thoughts into one realistic next action and reflect upon their personal growth through future-self letters and 3D messengers.
 
 Source: `scope.md > The Unique Kernel`, `scope.md > Who It's For`.
 

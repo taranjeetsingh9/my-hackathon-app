@@ -413,7 +413,7 @@ export default function Home() {
   useEffect(() => {
     if (user || hasHydratedRef.current) return;
     hasHydratedRef.current = true;
-    const saved = window.localStorage.getItem("mydobby-state");
+    const saved = window.localStorage.getItem("kokoro-state") || window.localStorage.getItem("mydobby-state");
     if (!saved) return;
 
     try {
@@ -439,7 +439,7 @@ export default function Home() {
   useEffect(() => {
     if (user) return; // Only sync to local storage for guests
     const payload = { mindDump, time, energy, goal, messenger, history, letters };
-    window.localStorage.setItem("mydobby-state", JSON.stringify(payload));
+    window.localStorage.setItem("kokoro-state", JSON.stringify(payload));
   }, [mindDump, time, energy, goal, messenger, history, letters, user]);
 
   useEffect(() => {
@@ -626,6 +626,7 @@ export default function Home() {
   };
 
   const resetJourney = () => {
+    window.localStorage.removeItem("kokoro-state");
     window.localStorage.removeItem("mydobby-state");
     setMindDump("");
     setTime("20 min");
@@ -645,7 +646,7 @@ export default function Home() {
           <p className="text-sm uppercase tracking-[0.18em] text-[#7b6894]">Ikigai 01</p>
           <h2 className="mt-4 text-4xl font-semibold tracking-tight text-[#2f2a36]">A calm life is not built by doing everything.</h2>
           <p className="mt-4 text-lg leading-8 text-[#5f5868]">
-            In the spirit of Ikigai, your life becomes clearer when you listen for what brings you wonder, meaning, and ease. Mydobby helps you gently notice what matters without turning it into pressure.
+            In the spirit of Ikigai, your life becomes clearer when you listen for what brings you wonder, meaning, and ease. Kokoro helps you gently notice what matters without turning it into pressure.
           </p>
           <div className="mt-6 flex gap-3">
             <button onClick={() => setScreen("intro2")} className="rounded-full bg-[#d9c8f4] px-6 py-3 text-base font-medium text-[#2a2340]">
@@ -693,7 +694,7 @@ export default function Home() {
           <p className="text-sm uppercase tracking-[0.18em] text-[#7b6894]">Ikigai 02</p>
           <h2 className="mt-4 text-4xl font-semibold tracking-tight text-[#2f2a36]">Your first step is not the whole path.</h2>
           <p className="mt-4 text-lg leading-8 text-[#5f5868]">
-            Mydobby turns your messy thoughts into one kind next move. It helps you make room for clarity, choose what fits your real energy, and honor the quiet pace that keeps you alive and purposeful.
+            Kokoro turns your messy thoughts into one kind next move. It helps you make room for clarity, choose what fits your real energy, and honor the quiet pace that keeps you alive and purposeful.
           </p>
           <div className="mt-6 flex justify-between gap-3">
             <button onClick={() => setScreen("intro1")} className="rounded-full border border-[#eadff8] px-4 py-2 text-[#3f3950]">
@@ -734,11 +735,11 @@ export default function Home() {
       <div className="grid items-center gap-8 md:grid-cols-[1.08fr_0.92fr]">
         <div>
           <div className="mb-6 inline-flex rounded-full border border-[#eadff8] bg-[linear-gradient(135deg,#f5eefe,#eefaf3,#fff5e7)] px-3 py-1.5 text-xs font-medium uppercase tracking-[0.14em] text-[#6d5d8a] shadow-sm">
-            Mydobby • AI Writing Sanctuary
+            Kokoro • AI Writing Sanctuary
           </div>
           <h1 className="text-4xl font-semibold tracking-[-0.04em] text-[#2d2634] md:text-5xl">Your next tiny, kind step is waiting.</h1>
           <p className="mt-4 max-w-xl text-lg leading-8 text-[#5d5669]">
-            Unload the noise in your head, notice the real energy in your day, and let Mydobby turn it into one gentle action you can actually finish.
+            Unload the noise in your head, notice the real energy in your day, and let Kokoro turn it into one gentle action you can actually finish.
           </p>
 
           <div className="mt-8 flex flex-wrap gap-3">
@@ -1259,13 +1260,13 @@ export default function Home() {
           <button
             onClick={() => setScreen("welcome")}
             className="flex items-center gap-3 transition hover:opacity-80 focus:outline-none"
-            title="Return to Mydobby Home"
+            title="Return to Kokoro Home"
           >
             <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#f0e6ff] text-lg font-semibold text-[#5e4e7d] shadow-xs">
-              M
+              K
             </div>
             <div className="text-left">
-              <p className="text-xs uppercase tracking-[0.18em] text-[#736a7f]">Mydobby</p>
+              <p className="text-xs uppercase tracking-[0.18em] text-[#736a7f]">Kokoro</p>
             </div>
           </button>
 
@@ -1522,7 +1523,7 @@ export default function Home() {
                     ✨
                   </div>
                   <div>
-                    <p className="text-xs text-[#7e6f92]">Signed in to Mydobby as</p>
+                    <p className="text-xs text-[#7e6f92]">Signed in to Kokoro as</p>
                     <p className="text-sm font-semibold text-[#2f273b]">{user.email}</p>
                     <p className="mt-0.5 font-mono text-[10px] text-[#8e82a0]">UID: {user.id}</p>
                   </div>
@@ -1556,7 +1557,7 @@ export default function Home() {
                 <div className="mb-4 rounded-xl border border-[#eadff8] bg-[#fbf9fe] p-3 text-xs leading-relaxed text-[#5e5370]">
                   <p className="font-medium text-[#3b3248]">🌱 Guest Mode Active</p>
                   <p className="mt-1 text-[11px] text-[#736685]">
-                    Mydobby does not force logins. Your thoughts and letters are safely saved in your browser&apos;s storage right now. If you want to backup across devices, you can log in or create a Supabase account below.
+                    Kokoro does not force logins. Your thoughts and letters are safely saved in your browser&apos;s storage right now. If you want to backup across devices, you can log in or create a Supabase account below.
                   </p>
                 </div>
 

@@ -3,10 +3,10 @@ doc: spec
 status: approved
 ---
 
-# Mydobby — Technical Specification
+# Kokoro (formerly Mydobby) — Technical Specification
 
 ## How This Works, In Plain Language
-Mydobby is a full-stack Next.js web application built around an emotional, low-friction user loop:
+Kokoro is a full-stack Next.js web application built around an emotional, low-friction user loop:
 1. The user dumps raw thoughts and selects their bandwidth.
 2. The client calls a server-side route `/api/plan`, which queries Groq AI or falls back to an Ikigai heuristics engine to isolate one concrete action.
 3. The user takes the action and marks it done.

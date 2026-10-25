@@ -13,10 +13,10 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Mydobby",
+  title: "Kokoro - Calm Ikigai Anti-Overwhelm Companion",
   description: "A calm, pastel app for turning overwhelm into one meaningful next step and future-self reflection.",
   openGraph: {
-    title: "Mydobby",
+    title: "Kokoro - Calm Ikigai Anti-Overwhelm Companion",
     description: "A calm, pastel app for turning overwhelm into one meaningful next step and future-self reflection.",
   },
 };

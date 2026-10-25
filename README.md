@@ -1,8 +1,8 @@
-# Mydobby
+# Kokoro (formerly Mydobby)
 
-Mydobby is a gentle, local-first personal companion for overwhelmed days. It helps users unload what's on their mind, check their real energy and time, and turn that into one small, meaningful next step.
+Kokoro is a gentle, local-first personal companion for overwhelmed days. It helps users unload what's on their mind, check their real energy and time, and turn that into one small, meaningful next step.
 
-The experience is designed to feel calm, warm, and supportive rather than productivity-driven. It blends journaling, reflection, and a lightweight AI-like planning assistant into one approachable flow.
+The experience is designed to feel calm, warm, and supportive rather than productivity-driven. It blends journaling, reflection, interactive 3D animal companions, and a lightweight AI planning assistant into one approachable flow.
 
 ## Why this app exists
 

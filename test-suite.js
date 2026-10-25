@@ -182,7 +182,7 @@ async function main() {
   it("verifies required planning doc 'scope.md' exists with approved status", () => {
     const content = fs.readFileSync(path.join(__dirname, "scope.md"), "utf8");
     assert.ok(content.includes("status: approved"));
-    assert.ok(content.includes("Mydobby"));
+    assert.ok(content.includes("Kokoro") || content.includes("Mydobby"));
   });
 
   it("verifies required planning doc 'prd.md' exists with approved status", () => {

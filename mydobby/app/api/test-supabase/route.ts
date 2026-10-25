@@ -42,14 +42,30 @@ export async function GET() {
       }, { status: 200 });
     }
 
+    // Test 2: Check tables existence (profiles, check_ins, letters)
+    const [profilesCheck, checkInsCheck, lettersCheck] = await Promise.all([
+      supabase.from("profiles").select("id").limit(1),
+      supabase.from("check_ins").select("id").limit(1),
+      supabase.from("letters").select("id").limit(1),
+    ]);
+
+    const tableErrors: string[] = [];
+    if (profilesCheck.error && profilesCheck.error.code === "42P01") tableErrors.push("profiles");
+    if (checkInsCheck.error && checkInsCheck.error.code === "42P01") tableErrors.push("check_ins");
+    if (lettersCheck.error && lettersCheck.error.code === "42P01") tableErrors.push("letters");
+
     return NextResponse.json({
       status: "connected",
-      message: "Successfully connected to your Supabase project!",
+      message: tableErrors.length > 0
+        ? `Connected to Supabase, but missing table(s): ${tableErrors.join(", ")}. Run supabase-schema.sql in the Supabase SQL Editor.`
+        : "Successfully connected to your Supabase project! All tables (profiles, check_ins, letters) are detected.",
       details: {
         url,
         keyPrefix: key.slice(0, 15) + "...",
         sessionActive: !!authData?.session,
         authReachable: true,
+        tablesReady: tableErrors.length === 0,
+        missingTables: tableErrors,
       },
     }, { status: 200 });
   } catch (err: unknown) {

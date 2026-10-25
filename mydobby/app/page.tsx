@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import confetti from "canvas-confetti";
 import Messenger3D, { MessengerType } from "./components/Messenger3D";
 import { supabase } from "../lib/supabase";
@@ -11,7 +11,7 @@ type EnergyLevel = "low" | "medium" | "high";
 type Status = "done" | "partial" | "changed" | "skipped";
 
 type HistoryItem = {
-  id: number;
+  id: number | string;
   title: string;
   status: Status;
   date: string;
@@ -150,21 +150,172 @@ export default function Home() {
   const [supabaseStatus, setSupabaseStatus] = useState<{
     status: string;
     message: string;
-    details?: { url?: string; keyPrefix?: string; sessionActive?: boolean; authReachable?: boolean; error?: string };
+    details?: { url?: string; keyPrefix?: string; sessionActive?: boolean; authReachable?: boolean; error?: string; tablesReady?: boolean; missingTables?: string[] };
   } | null>(null);
 
+  // Supabase Sync & Error state (Requirement 5: Show real errors, never silently swallow)
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  // Load user data from Supabase tables
+  const loadUserDataFromSupabase = useCallback(async (currentUser: User) => {
+    if (!supabase) return;
+    setIsSyncing(true);
+    setSaveError(null);
+
+    try {
+      // 1. Load Profile
+      const { data: profile, error: profileErr } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", currentUser.id)
+        .maybeSingle();
+
+      if (profileErr) {
+        throw new Error(`Profile query error: ${profileErr.message} (Code: ${profileErr.code || "unknown"})`);
+      }
+
+      if (profile) {
+        const loadedMindDump = profile.mind_dump ?? profile.current_mind_dump;
+        if (loadedMindDump !== undefined && loadedMindDump !== null) {
+          setMindDump(loadedMindDump);
+        }
+        const loadedTime = profile.time_budget ?? profile.current_time;
+        if (loadedTime) setTime(loadedTime as TimeOption);
+        const loadedEnergy = profile.energy_level ?? profile.current_energy;
+        if (loadedEnergy) setEnergy(loadedEnergy as EnergyLevel);
+        const loadedGoal = profile.goal ?? profile.current_goal;
+        if (loadedGoal !== undefined && loadedGoal !== null) {
+          setGoal(loadedGoal);
+        }
+        if (profile.messenger) setMessenger(profile.messenger as MessengerType);
+        if (loadedMindDump || loadedGoal) {
+          setScreen("step");
+        }
+      } else {
+        // Initialize profile row in Supabase
+        const { error: insErr } = await supabase.from("profiles").upsert({
+          id: currentUser.id,
+          email: currentUser.email,
+          mind_dump: mindDump || "",
+          time_budget: time,
+          energy_level: energy,
+          goal: goal || "",
+          messenger: messenger,
+          updated_at: new Date().toISOString(),
+        });
+        if (insErr) {
+          throw new Error(`Profile init error: ${insErr.message} (Code: ${insErr.code || "unknown"})`);
+        }
+      }
+
+      // 2. Load Check-Ins (Action History)
+      const { data: checkIns, error: checkInsErr } = await supabase
+        .from("check_ins")
+        .select("*")
+        .eq("user_id", currentUser.id)
+        .order("created_at", { ascending: false });
+
+      if (checkInsErr) {
+        throw new Error(`Check-ins query error: ${checkInsErr.message} (Code: ${checkInsErr.code || "unknown"})`);
+      }
+
+      if (checkIns) {
+        setHistory(
+          checkIns.map((item) => ({
+            id: item.id,
+            title: item.title,
+            status: item.status as Status,
+            date: item.date,
+          }))
+        );
+      }
+
+      // 3. Load Letters
+      const { data: lettersData, error: lettersErr } = await supabase
+        .from("letters")
+        .select("*")
+        .eq("user_id", currentUser.id)
+        .order("created_at", { ascending: false });
+
+      if (lettersErr) {
+        throw new Error(`Letters query error: ${lettersErr.message} (Code: ${lettersErr.code || "unknown"})`);
+      }
+
+      if (lettersData) {
+        setLetters(
+          lettersData.map((l) => ({
+            type: l.type as LetterType,
+            title: l.title,
+            body: l.body,
+            summary: l.summary || "",
+          }))
+        );
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setSaveError(msg);
+    } finally {
+      setIsSyncing(false);
+    }
+  }, [mindDump, time, energy, goal, messenger]);
+
+  // Sync profile edits (mindDump, time, energy, goal, messenger) to Supabase
+  const syncProfileToSupabase = async (overrides?: {
+    mindDump?: string;
+    time?: TimeOption;
+    energy?: EnergyLevel;
+    goal?: string;
+    messenger?: MessengerType;
+  }) => {
+    if (!supabase || !user) return;
+    try {
+      const payload = {
+        id: user.id,
+        email: user.email,
+        mind_dump: overrides?.mindDump !== undefined ? overrides.mindDump : mindDump,
+        time_budget: overrides?.time !== undefined ? overrides.time : time,
+        energy_level: overrides?.energy !== undefined ? overrides.energy : energy,
+        goal: overrides?.goal !== undefined ? overrides.goal : goal,
+        messenger: overrides?.messenger !== undefined ? overrides.messenger : messenger,
+        updated_at: new Date().toISOString(),
+      };
+      const { error } = await supabase.from("profiles").upsert(payload);
+      if (error) {
+        setSaveError(`Supabase Profile Save Failed: ${error.message} (Code: ${error.code || "unknown"})`);
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setSaveError(`Supabase Profile Save Error: ${msg}`);
+    }
+  };
+
+  // Supabase Auth lifecycle
   useEffect(() => {
     if (!supabase) return;
-    supabase.auth.getUser().then(({ data }) => {
-      setUser(data.user ?? null);
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      const currentUser = session?.user ?? null;
+      setUser(currentUser);
+      if (currentUser) {
+        loadUserDataFromSupabase(currentUser);
+      }
     });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      const nextUser = session?.user ?? null;
+      setUser(nextUser);
+      if (nextUser) {
+        await loadUserDataFromSupabase(nextUser);
+      }
     });
+
     return () => {
       subscription.unsubscribe();
     };
-  }, []);
+  }, [loadUserDataFromSupabase]);
 
   const checkSupabaseConnection = async () => {
     setIsTestingSupabase(true);
@@ -188,7 +339,7 @@ export default function Home() {
     e.preventDefault();
     if (!supabase) {
       setAuthNotice({
-        text: "Supabase client not initialized. Please verify NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY in .env.local",
+        text: "Supabase client not initialized. Please verify NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY in your environment variables.",
         error: true,
       });
       return;
@@ -200,6 +351,8 @@ export default function Home() {
 
     setAuthLoading(true);
     setAuthNotice(null);
+    setSaveError(null);
+
     try {
       if (authMode === "signup") {
         const { data, error } = await supabase.auth.signUp({
@@ -207,18 +360,26 @@ export default function Home() {
           password: authPassword,
         });
         if (error) throw error;
-        if (data.user && !data.session) {
-          setAuthNotice({ text: "Account created! Please check your email to confirm registration." });
-        } else {
-          setAuthNotice({ text: "Signed up and logged in successfully!" });
+        if (data.session && data.user) {
+          setUser(data.user);
+          setAuthNotice({ text: "Account created and signed in successfully!" });
+          await loadUserDataFromSupabase(data.user);
+        } else if (data.user && !data.session) {
+          setAuthNotice({
+            text: "Account registered! If 'Confirm email' is disabled in your Supabase dashboard, switch to 'Sign In' to log in immediately. Otherwise, verify via email.",
+          });
         }
       } else {
-        const { error } = await supabase.auth.signInWithPassword({
+        const { data, error } = await supabase.auth.signInWithPassword({
           email: authEmail,
           password: authPassword,
         });
         if (error) throw error;
-        setAuthNotice({ text: "Logged in successfully!" });
+        if (data.user) {
+          setUser(data.user);
+          setAuthNotice({ text: "Logged in successfully!" });
+          await loadUserDataFromSupabase(data.user);
+        }
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -230,12 +391,26 @@ export default function Home() {
 
   const handleSignOut = async () => {
     if (!supabase) return;
-    await supabase.auth.signOut();
+    try {
+      await supabase.auth.signOut();
+    } catch (err) {
+      console.error("Sign out error", err);
+    }
     setUser(null);
+    setSaveError(null);
+    setMindDump("");
+    setTime("20 min");
+    setEnergy("medium");
+    setGoal("");
+    setHistory([]);
+    setLetters([]);
+    setScreen("welcome");
     setAuthNotice({ text: "Logged out. You are now using Guest Mode (Local storage)." });
   };
 
+  // Local storage backup for guest users only
   useEffect(() => {
+    if (user) return; // Don't use guest local storage when authenticated
     const saved = window.localStorage.getItem("mydobby-state");
     if (!saved) return;
 
@@ -254,12 +429,13 @@ export default function Home() {
     } catch {
       // ignore malformed storage and continue
     }
-  }, []);
+  }, [user]);
 
   useEffect(() => {
+    if (user) return; // Only sync to local storage for guests
     const payload = { mindDump, time, energy, goal, messenger, history, letters };
     window.localStorage.setItem("mydobby-state", JSON.stringify(payload));
-  }, [mindDump, time, energy, goal, messenger, history, letters]);
+  }, [mindDump, time, energy, goal, messenger, history, letters, user]);
 
   useEffect(() => {
     if (screen !== "step") return;
@@ -309,12 +485,17 @@ export default function Home() {
   const activePlan = aiPlan?.plan || planInsight.plan;
   const recommendedStep = isLoadingStep ? "Generating your next gentle step with Groq AI..." : activeNextStep;
 
-  const addHistoryItem = (status: Status) => {
+  // Add Action Result & Save to Supabase check_ins
+  const addHistoryItem = async (status: Status) => {
+    const title = goal || "General momentum";
+    const date = new Date().toLocaleDateString();
+    const tempId = Date.now();
+
     const item: HistoryItem = {
-      id: Date.now(),
-      title: goal || "General momentum",
+      id: tempId,
+      title,
       status,
-      date: new Date().toLocaleDateString(),
+      date,
     };
 
     if (status === "done" || status === "partial") {
@@ -331,10 +512,40 @@ export default function Home() {
     }
 
     setHistory((prev) => [item, ...prev]);
+
+    // Save to Supabase if authenticated
+    if (supabase && user) {
+      try {
+        const { data, error } = await supabase
+          .from("check_ins")
+          .insert({
+            user_id: user.id,
+            title,
+            status,
+            date,
+          })
+          .select()
+          .single();
+
+        if (error) {
+          setSaveError(`Supabase Action Save Failed: ${error.message} (Code: ${error.code || "unknown"})`);
+        } else if (data) {
+          setHistory((prev) =>
+            prev.map((h) => (h.id === tempId ? { ...h, id: data.id } : h))
+          );
+        }
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        setSaveError(`Supabase Action Save Error: ${msg}`);
+      }
+    }
   };
 
+  // Generate Letter & Save to Supabase letters
   const generateLetter = async (type: LetterType) => {
     setIsGeneratingLetter(true);
+    let letterResult: { type: LetterType; title: string; body: string; summary: string } | null = null;
+
     try {
       const response = await fetch("/api/letter", {
         method: "POST",
@@ -347,6 +558,19 @@ export default function Home() {
       }
 
       const letter = await response.json();
+      letterResult = { type, ...letter };
+    } catch {
+      const letter =
+        type === "monthly"
+          ? generateMonthlyLetter(mindDump, goal, messenger)
+          : generateMilestoneLetter(mindDump, goal, history);
+
+      letterResult = { type, ...letter };
+    } finally {
+      setIsGeneratingLetter(false);
+    }
+
+    if (letterResult) {
       try {
         confetti({
           particleCount: 65,
@@ -357,18 +581,30 @@ export default function Home() {
       } catch {
         // ignore
       }
-      setLetters((prev) => [{ type, ...letter }, ...prev]);
-      setScreen("letters");
-    } catch {
-      const letter =
-        type === "monthly"
-          ? generateMonthlyLetter(mindDump, goal, messenger)
-          : generateMilestoneLetter(mindDump, goal, history);
 
-      setLetters((prev) => [{ type, ...letter }, ...prev]);
+      setLetters((prev) => [letterResult!, ...prev]);
       setScreen("letters");
-    } finally {
-      setIsGeneratingLetter(false);
+
+      // Save to Supabase if authenticated
+      if (supabase && user) {
+        try {
+          const { error } = await supabase.from("letters").insert({
+            user_id: user.id,
+            type: letterResult.type,
+            title: letterResult.title,
+            body: letterResult.body,
+            summary: letterResult.summary || "",
+            messenger: messenger,
+          });
+
+          if (error) {
+            setSaveError(`Supabase Letter Save Failed: ${error.message} (Code: ${error.code || "unknown"})`);
+          }
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : String(err);
+          setSaveError(`Supabase Letter Save Error: ${msg}`);
+        }
+      }
     }
   };
 
@@ -545,7 +781,10 @@ export default function Home() {
           Back
         </button>
         <button
-          onClick={() => setScreen("energy")}
+          onClick={() => {
+            syncProfileToSupabase({ mindDump });
+            setScreen("energy");
+          }}
           className="rounded-full bg-[#d7f0e2] px-5 py-2.5 font-medium text-[#1d3b2d]"
           disabled={!mindDump.trim()}
         >
@@ -598,7 +837,13 @@ export default function Home() {
         <button onClick={() => setScreen("mind")} className="rounded-full border border-[#eadff8] px-4 py-2 text-[#3f3950]">
           Back
         </button>
-        <button onClick={() => setScreen("goal")} className="rounded-full bg-[#d9c8f4] px-5 py-2.5 font-medium text-[#2a2340]">
+        <button
+          onClick={() => {
+            syncProfileToSupabase({ time, energy });
+            setScreen("goal");
+          }}
+          className="rounded-full bg-[#d9c8f4] px-5 py-2.5 font-medium text-[#2a2340]"
+        >
           Continue
         </button>
       </div>
@@ -620,7 +865,13 @@ export default function Home() {
         <button onClick={() => setScreen("energy")} className="rounded-full border border-[#eadff8] px-4 py-2 text-[#3f3950]">
           Back
         </button>
-        <button onClick={() => setScreen("step")} className="rounded-full bg-[#d9c8f4] px-5 py-2.5 font-medium text-[#2a2340]">
+        <button
+          onClick={() => {
+            syncProfileToSupabase({ goal });
+            setScreen("step");
+          }}
+          className="rounded-full bg-[#d9c8f4] px-5 py-2.5 font-medium text-[#2a2340]"
+        >
           {goal ? "Use this goal" : "Skip for now"}
         </button>
       </div>
@@ -739,7 +990,10 @@ export default function Home() {
       <div className="h-[560px] w-full rounded-[36px] border border-white/80 bg-white/80 p-2 shadow-[0_20px_70px_rgba(144,118,167,0.14)]">
         <Messenger3D
           currentMessenger={messenger}
-          onSelectMessenger={(name) => setMessenger(name)}
+          onSelectMessenger={(name) => {
+            setMessenger(name);
+            syncProfileToSupabase({ messenger: name });
+          }}
           className="h-full w-full"
         />
       </div>
@@ -765,7 +1019,10 @@ export default function Home() {
         <div className="h-[300px] w-full overflow-hidden rounded-[24px]">
           <Messenger3D
             currentMessenger={messenger}
-            onSelectMessenger={(name) => setMessenger(name)}
+            onSelectMessenger={(name) => {
+              setMessenger(name);
+              syncProfileToSupabase({ messenger: name });
+            }}
             isEmbedded={true}
             className="h-full w-full"
           />
@@ -789,7 +1046,10 @@ export default function Home() {
             {birdOptions.map((option) => (
               <button
                 key={option}
-                onClick={() => setMessenger(option)}
+                onClick={() => {
+                  setMessenger(option);
+                  syncProfileToSupabase({ messenger: option });
+                }}
                 className={`rounded-full border px-3 py-1.5 text-sm transition ${
                   messenger === option ? "border-[#d1b8f3] bg-[#f3ebff] font-medium text-[#2f2144]" : "border-[#eadff8] bg-white text-[#4d4660] hover:bg-[#faf6ff]"
                 }`}
@@ -893,7 +1153,8 @@ export default function Home() {
               className="flex items-center gap-1.5 rounded-full border border-[#eadff8] bg-white px-3.5 py-1.5 text-xs font-medium text-[#443d59] shadow-xs hover:bg-[#faf6ff]"
               title="Supabase connection status and authentication"
             >
-              <span>{user ? "👤 Account" : "☁️ Cloud / Login"}</span>
+              <span>{user ? `👤 ${user.email?.split("@")[0]}` : "☁️ Cloud / Login"}</span>
+              {isSyncing && <span className="animate-spin text-[10px] text-[#7b6894]">↻</span>}
               <span
                 className={`h-2 w-2 rounded-full ${
                   supabaseStatus?.status === "connected"
@@ -932,6 +1193,35 @@ export default function Home() {
             </button>
           </div>
         </header>
+
+        {/* Real Error Banner (Requirement 5: Show real errors during testing, do not silently swallow) */}
+        {saveError && (
+          <div className="mb-6 flex items-start justify-between rounded-2xl border border-rose-300 bg-rose-50/95 p-4 text-rose-900 shadow-sm backdrop-blur-sm animate-fade-in">
+            <div className="flex items-start gap-3">
+              <span className="text-xl">⚠️</span>
+              <div>
+                <h4 className="text-sm font-semibold text-rose-950">Supabase Save Notice</h4>
+                <p className="mt-1 text-xs leading-relaxed text-rose-800 font-mono break-all">{saveError}</p>
+              </div>
+            </div>
+            <div className="ml-4 flex shrink-0 items-center gap-2">
+              {user && (
+                <button
+                  onClick={() => loadUserDataFromSupabase(user)}
+                  className="rounded-full border border-rose-300 bg-white px-2.5 py-1 text-xs font-medium text-rose-800 hover:bg-rose-50"
+                >
+                  ↻ Retry
+                </button>
+              )}
+              <button
+                onClick={() => setSaveError(null)}
+                className="rounded-full border border-rose-300 bg-white px-2.5 py-1 text-xs font-medium text-rose-700 hover:bg-rose-100"
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+        )}
 
         {screen === "welcome" && renderWelcome()}
         {screen === "intro1" && renderIntroOne()}
@@ -1084,20 +1374,28 @@ export default function Home() {
                   <div>
                     <p className="text-xs text-[#7e6f92]">Signed in to Mydobby as</p>
                     <p className="text-sm font-semibold text-[#2f273b]">{user.email}</p>
+                    <p className="mt-0.5 font-mono text-[10px] text-[#8e82a0]">UID: {user.id}</p>
                   </div>
                 </div>
 
                 <div className="mt-4 rounded-xl bg-white p-3 text-xs text-[#5f5370]">
-                  <p>✓ Cloud sync ready</p>
-                  <p className="mt-1 text-[11px] text-[#7f7391]">
-                    Your reflections and future-self letters are tied to this account.
+                  <p className="font-semibold text-emerald-700">✓ Supabase Cloud Sync Active</p>
+                  <p className="mt-1 text-[11px] leading-relaxed text-[#7f7391]">
+                    Your profile, check-ins, and future-self letters are synced directly to your Supabase tables (<code className="font-mono">profiles</code>, <code className="font-mono">check_ins</code>, <code className="font-mono">letters</code>) with Row Level Security.
                   </p>
                 </div>
 
-                <div className="mt-5 flex justify-end">
+                <div className="mt-4 flex items-center justify-between gap-2 border-t border-[#f0e8f8] pt-4">
+                  <button
+                    onClick={() => loadUserDataFromSupabase(user)}
+                    disabled={isSyncing}
+                    className="rounded-full border border-[#dcd0ec] bg-white px-3 py-1.5 text-xs font-medium text-[#584572] hover:bg-[#f5eefc] disabled:opacity-60"
+                  >
+                    {isSyncing ? "Syncing..." : "↻ Refresh Cloud Data"}
+                  </button>
                   <button
                     onClick={handleSignOut}
-                    className="rounded-full border border-[#eadff8] bg-white px-4 py-1.5 text-xs font-medium text-[#7d3b3b] hover:bg-rose-50"
+                    className="rounded-full border border-rose-200 bg-white px-4 py-1.5 text-xs font-medium text-[#7d3b3b] hover:bg-rose-50"
                   >
                     Log Out
                   </button>

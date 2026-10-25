@@ -608,7 +608,16 @@ export default function Home() {
     }
   };
 
-  const startJourney = () => setScreen("intro1");
+  const startNewCheckIn = () => {
+    setMindDump("");
+    setGoal("");
+    setTime("20 min");
+    setEnergy("medium");
+    setAiPlan(null);
+    setStepReason("");
+    syncProfileToSupabase({ mindDump: "", goal: "" });
+    setScreen("mind");
+  };
 
   const resetJourney = () => {
     window.localStorage.removeItem("mydobby-state");
@@ -727,11 +736,19 @@ export default function Home() {
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <button
-              onClick={startJourney}
-              className="rounded-full bg-[linear-gradient(135deg,#d9c8f4,#cfeee3)] px-6 py-3 text-base font-medium text-[#2a2340] shadow-[0_14px_30px_rgba(183,154,220,0.28)] transition-transform duration-200 hover:-translate-y-0.5"
+              onClick={startNewCheckIn}
+              className="rounded-full bg-[linear-gradient(135deg,#d9c8f4,#cfeee3)] px-6 py-3 text-base font-semibold text-[#2a2340] shadow-[0_14px_30px_rgba(183,154,220,0.28)] transition-transform duration-200 hover:-translate-y-0.5"
             >
-              Start my check-in
+              🌿 Start check-in
             </button>
+            {history.length > 0 && (
+              <button
+                onClick={() => setScreen("letters")}
+                className="rounded-full border border-[#d9c8f4] bg-[#faf6ff] px-5 py-3 text-base font-medium text-[#443761] hover:bg-[#f3ebff]"
+              >
+                📜 My Past Actions ({history.length})
+              </button>
+            )}
             <button
               onClick={() => setScreen("intro1")}
               className="rounded-full border border-[#eadff8] bg-white/80 px-5 py-3 text-base font-medium text-[#413b52] hover:bg-white"
@@ -939,24 +956,42 @@ export default function Home() {
         ))}
       </div>
 
-      <div className="mt-8 flex flex-wrap gap-3">
-        <button onClick={() => setScreen("goal")} className="rounded-full border border-[#eadff8] px-4 py-2 text-[#3f3950]">
-          Edit goal
-        </button>
-        <button
-          onClick={() => generateLetter("milestone")}
-          className="rounded-full bg-[#d9c8f4] px-5 py-2.5 font-medium text-[#2a2340] disabled:cursor-not-allowed disabled:opacity-60"
-          disabled={isGeneratingLetter}
-        >
-          {isGeneratingLetter ? "Writing..." : "Write milestone letter"}
-        </button>
-        <button
-          onClick={() => generateLetter("monthly")}
-          className="rounded-full bg-[#d7f0e2] px-5 py-2.5 font-medium text-[#1d3b2d] disabled:cursor-not-allowed disabled:opacity-60"
-          disabled={isGeneratingLetter}
-        >
-          {isGeneratingLetter ? "Sending..." : "Send monthly letter"}
-        </button>
+      <div className="mt-8 flex flex-wrap items-center justify-between gap-3 border-t border-[#f0e8f8] pt-6">
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={startNewCheckIn}
+            className="flex items-center gap-1.5 rounded-full border border-[#bfe7d1] bg-[linear-gradient(135deg,#e3f7ed,#d8f4e6)] px-4 py-2 text-sm font-semibold text-[#1c4e38] shadow-xs transition hover:scale-[1.02]"
+          >
+            <span>🌿</span>
+            <span>Another Check-in</span>
+          </button>
+          <button
+            onClick={() => setScreen("welcome")}
+            className="rounded-full border border-[#eadff8] bg-white px-4 py-2 text-sm text-[#3f3950] hover:bg-[#faf6ff]"
+          >
+            🏠 Return Home
+          </button>
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          <button onClick={() => setScreen("goal")} className="rounded-full border border-[#eadff8] bg-white px-4 py-2 text-sm text-[#3f3950] hover:bg-[#faf6ff]">
+            Edit goal
+          </button>
+          <button
+            onClick={() => generateLetter("milestone")}
+            className="rounded-full bg-[#d9c8f4] px-4 py-2 text-sm font-medium text-[#2a2340] transition hover:bg-[#cfbcee] disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={isGeneratingLetter}
+          >
+            {isGeneratingLetter ? "Writing..." : "Write milestone letter"}
+          </button>
+          <button
+            onClick={() => generateLetter("monthly")}
+            className="rounded-full bg-[#d7f0e2] px-4 py-2 text-sm font-medium text-[#1d3b2d] transition hover:bg-[#c6ebd4] disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={isGeneratingLetter}
+          >
+            {isGeneratingLetter ? "Sending..." : "Send monthly letter"}
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -971,10 +1006,23 @@ export default function Home() {
             Drag to orbit, scroll to zoom. Switch avatars below to see how each messenger carries your future letters.
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={startNewCheckIn}
+            className="flex items-center gap-1.5 rounded-full border border-[#bfe7d1] bg-[linear-gradient(135deg,#e3f7ed,#d8f4e6)] px-4 py-2 text-sm font-semibold text-[#1c4e38] shadow-xs transition hover:scale-[1.02]"
+          >
+            <span>🌿</span>
+            <span>New Check-in</span>
+          </button>
+          <button
+            onClick={() => setScreen("welcome")}
+            className="rounded-full border border-[#eadff8] bg-white px-3.5 py-2 text-sm font-medium text-[#443d59] hover:bg-[#faf6ff]"
+          >
+            🏠 Home
+          </button>
           <button
             onClick={() => setScreen("step")}
-            className="rounded-full border border-[#eadff8] bg-white px-4 py-2 text-sm font-medium text-[#443d59] hover:bg-[#faf6ff]"
+            className="rounded-full border border-[#eadff8] bg-white px-3.5 py-2 text-sm font-medium text-[#443d59] hover:bg-[#faf6ff]"
           >
             Back to Step
           </button>
@@ -1030,14 +1078,32 @@ export default function Home() {
       </div>
 
       <div className="rounded-[32px] border border-white/70 bg-white/80 p-8 shadow-[0_18px_60px_rgba(126,109,134,0.12)] backdrop-blur-sm">
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-sm uppercase tracking-[0.15em] text-[#7b6894]">Progress archive</p>
             <h2 className="mt-2 text-3xl font-semibold text-[#2f2a36]">Your reflective history</h2>
           </div>
-          <button onClick={() => setScreen("step")} className="rounded-full border border-[#eadff8] px-4 py-2 text-[#3f3950] hover:bg-white">
-            Back to step
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={startNewCheckIn}
+              className="flex items-center gap-1.5 rounded-full border border-[#bfe7d1] bg-[linear-gradient(135deg,#e3f7ed,#d8f4e6)] px-4 py-2 text-sm font-semibold text-[#1c4e38] shadow-xs transition hover:scale-[1.02]"
+            >
+              <span>🌿</span>
+              <span>New Check-in</span>
+            </button>
+            <button
+              onClick={() => setScreen("step")}
+              className="rounded-full border border-[#eadff8] bg-white px-3.5 py-2 text-sm text-[#3f3950] hover:bg-[#faf6ff]"
+            >
+              Back to step
+            </button>
+            <button
+              onClick={() => setScreen("welcome")}
+              className="rounded-full border border-[#eadff8] bg-white px-3.5 py-2 text-sm text-[#3f3950] hover:bg-[#faf6ff]"
+            >
+              🏠 Home
+            </button>
+          </div>
         </div>
 
         <div className="mt-6">
@@ -1135,14 +1201,39 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top,_#fffdfd_0%,_#f9f2ff_28%,_#edf9f3_60%,_#fff6eb_100%)] px-4 py-8 text-[#2f2a36] sm:px-6 lg:px-8">
       <div className="mx-auto max-w-6xl">
-        <header className="mb-8 flex items-center justify-between rounded-full border border-white/80 bg-white/40 px-5 py-3 shadow-[0_12px_40px_rgba(126,109,134,0.08)] backdrop-blur-sm">
-          <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#f0e6ff] text-lg text-[#5e4e7d]">M</div>
-            <div>
+        <header className="mb-8 flex flex-wrap items-center justify-between gap-3 rounded-full border border-white/80 bg-white/50 px-5 py-3 shadow-[0_12px_40px_rgba(126,109,134,0.08)] backdrop-blur-sm">
+          <button
+            onClick={() => setScreen("welcome")}
+            className="flex items-center gap-3 transition hover:opacity-80 focus:outline-none"
+            title="Return to Mydobby Home"
+          >
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#f0e6ff] text-lg font-semibold text-[#5e4e7d] shadow-xs">
+              M
+            </div>
+            <div className="text-left">
               <p className="text-xs uppercase tracking-[0.18em] text-[#736a7f]">Mydobby</p>
             </div>
-          </div>
-          <div className="flex items-center gap-2">
+          </button>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={() => setScreen("welcome")}
+              className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${
+                screen === "welcome"
+                  ? "border-[#cbb3ed] bg-[#d9c8f4] text-[#2a2340]"
+                  : "border-[#eadff8] bg-white text-[#443d59] hover:bg-[#faf6ff]"
+              }`}
+            >
+              🏠 Home
+            </button>
+            <button
+              onClick={startNewCheckIn}
+              className="flex items-center gap-1.5 rounded-full border border-[#bfe7d1] bg-[linear-gradient(135deg,#e3f7ed,#edf9f3)] px-3.5 py-1.5 text-xs font-semibold text-[#1c4e38] shadow-xs transition hover:scale-[1.02] hover:bg-[#d5f3e3]"
+              title="Start a new check-in without losing past actions or letters"
+            >
+              <span>🌿</span>
+              <span>New Check-in</span>
+            </button>
             <button
               onClick={() => {
                 setShowAuthModal(true);
@@ -1183,13 +1274,18 @@ export default function Home() {
                   : "border-[#eadff8] bg-white text-[#443d59] hover:bg-[#faf6ff]"
               }`}
             >
-              Letters
+              📜 Letters {letters.length > 0 && <span className="ml-1 rounded-full bg-[#e9dcff] px-1.5 py-0.2 text-[10px] text-[#483569]">{letters.length}</span>}
             </button>
             <button
-              onClick={resetJourney}
-              className="rounded-full border border-[#eadff8] bg-white px-3 py-1.5 text-xs font-medium text-[#443d59] hover:bg-[#faf6ff]"
+              onClick={() => {
+                if (typeof window !== "undefined" && window.confirm("Start over completely and clear your progress history?")) {
+                  resetJourney();
+                }
+              }}
+              className="rounded-full border border-[#eadff8] bg-white px-3 py-1.5 text-xs font-medium text-[#736882] hover:bg-rose-50 hover:text-rose-700"
+              title="Reset all current progress and data"
             >
-              Reset
+              Reset All
             </button>
           </div>
         </header>

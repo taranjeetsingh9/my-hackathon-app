@@ -83,7 +83,12 @@ Follow this 5-minute testing path:
    * Click **"📜 Read in Ceremony"** on the generated letter.
    * The animated wax seal pops open, revealing your letter written from your future self.
    * Click **📋 Copy Letter** to verify clipboard functionality.
-7. **Persistence Verification**:
+7. **Logging Multiple Sequential Check-Ins**:
+   * Want to log another action without losing past progress?
+   * Tap **🌿 Another Check-in** (on the Step screen) or **🌿 New Check-in** in the top header.
+   * You can also click the **Mydobby Logo** or **🏠 Home** to return to the welcome landing at any time.
+   * Notice your previous check-ins and letters remain intact in the **📜 Letters** archive and in Supabase `check_ins`.
+8. **Persistence Verification**:
    * Press **F5 / Command+R** to refresh the browser page.
    * Notice your account is still signed in, your progress history remains intact, and your letters are preserved.
    * Click **Log Out** in the Account modal → state resets for Guest Mode.

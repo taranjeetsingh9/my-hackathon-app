@@ -1,1 +1,1 @@
-export { POST } from "../../mydobby/app/api/plan/route";
+export { POST } from "../../Kokoro/app/api/plan/route";

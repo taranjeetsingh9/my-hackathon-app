@@ -3,16 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev -p 3000 -H 0.0.0.0",
     "build": "next build",
-    "start": "next start",
-    "lint": "eslint",
-    "test": "tsx --test tests/ai-response.test.ts"
+    "start": "next start -p 3000 -H 0.0.0.0",
+    "lint": "eslint"
   },
   "dependencies": {
-    "@supabase/server": "^1.4.1",
-    "@supabase/ssr": "^0.12.7",
-    "@supabase/supabase-js": "^2.109.0",
     "next": "16.4.2",
     "react": "19.3.0",
     "react-dom": "19.3.0"
@@ -25,7 +21,6 @@
     "eslint": "^9",
     "eslint-config-next": "16.4.2",
     "tailwindcss": "^4",
-    "tsx": "^4.23.15",
     "typescript": "^5"
   }
 }

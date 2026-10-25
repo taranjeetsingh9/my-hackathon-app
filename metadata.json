@@ -1,0 +1,8 @@
+{
+  "name": "Mydobby",
+  "description": "A calm, pastel app for turning overwhelm into one meaningful next step and future-self reflection.",
+  "permissions": [],
+  "capabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

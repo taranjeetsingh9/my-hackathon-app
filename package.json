@@ -1,0 +1,23 @@
+{
+  "name": "my-hackathon-app",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "mydobby"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace=mydobby",
+    "build": "npm run build --workspace=mydobby",
+    "start": "npm run start --workspace=mydobby",
+    "lint": "npm run lint --workspace=mydobby"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.118.0",
+    "canvas-confetti": "^1.9.4",
+    "three": "^0.186.1"
+  },
+  "devDependencies": {
+    "@types/canvas-confetti": "^1.9.0",
+    "@types/three": "^0.186.0"
+  }
+}

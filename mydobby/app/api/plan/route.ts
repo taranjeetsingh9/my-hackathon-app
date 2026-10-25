@@ -1,180 +1,90 @@
-import { readFileSync } from "fs";
-
-import { parsePlanModelResponse } from "../../../lib/ai-response";
-
-const demoPlanResponse = JSON.parse(
-  readFileSync(new URL("../../data/demo-ai-response.json", import.meta.url), "utf8"),
-) as {
-  nextStep: string;
-  why: string;
-  priority: string;
-  currentLoad: string;
-  plan: string;
-  source: string;
-};
+import { NextResponse } from "next/server";
 
 export async function POST(request: Request) {
-  const { mindDump = "", goal = "", time = "20 min", energy = "medium" } = await request.json();
-
-  const fallback = buildFallbackPlan(mindDump, goal, time, energy);
-  const geminiKey = process.env.GEMINI_API_KEY;
-  const openAiKey = process.env.OPENAI_API_KEY;
-  const groqKey = process.env.GROQ_API_KEY;
-  const preferredProvider = (process.env.AI_PROVIDER || "gemini").toLowerCase().trim();
-  const providerOrder =
-    preferredProvider === "openai"
-      ? ["openai", "gemini", "groq"]
-      : preferredProvider === "groq"
-        ? ["groq", "gemini", "openai"]
-        : ["gemini", "openai", "groq"];
-
-  if (!geminiKey && !openAiKey && !groqKey) {
-    return Response.json({
-      ...demoPlanResponse,
-      nextStep: fallback.nextStep,
-      why: fallback.why,
-      priority: fallback.priority,
-      currentLoad: fallback.currentLoad,
-      plan: fallback.plan,
-      source: "demo",
-    });
-  }
-
   try {
-    for (const provider of providerOrder) {
-      if (provider === "gemini" && geminiKey) {
-        const response = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`,
-          {
+    const {
+      mindDump = "",
+      goal = "",
+      time = "20 min",
+      energy = "medium",
+    } = await request.json();
+
+    const groqKey = process.env.GROQ_API_KEY;
+
+    if (groqKey) {
+      const systemPrompt = `You are Mydobby, an empathetic, perceptive, and gentle AI companion inspired by the philosophy of Ikigai.
+Your mission is to help overwhelmed people transform mental clutter into one kind, realistic, and visible next action that fits their actual time and energy.
+Do NOT give them a huge list. Focus on ONE concrete next step.
+
+Respond strictly in valid JSON with these exact fields:
+{
+  "nextStep": "A concrete, achievable, low-friction action (1-2 sentences) tailored to their available time and energy.",
+  "why": "A gentle 1-2 sentence explanation of why this step is kind and realistic right now.",
+  "priority": "A 1-sentence statement clarifying the core thing that matters most today.",
+  "currentLoad": "An empathetic 1-sentence validation of what they are currently holding without judgment.",
+  "plan": "A concise 1-sentence realistic container plan for their time block."
+}`;
+
+      const userPrompt = `User's current state:
+- Mind dump: "${mindDump || "Feeling scattered and unsure where to start"}"
+- Chosen goal: "${goal || "No specific goal chosen yet"}"
+- Available time: ${time}
+- Energy level: ${energy}`;
+
+      const candidateModels = ["qwen/qwen3.8-27b", "openai/gpt-oss-120b", "openai/gpt-oss-20b"];
+      
+      for (const model of candidateModels) {
+        try {
+          const groqResponse = await fetch("https://api.groq.com/openai/v1/chat/completions", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: {
+              Authorization: `Bearer ${groqKey}`,
+              "Content-Type": "application/json",
+            },
             body: JSON.stringify({
-              contents: [
-                {
-                  parts: [
-                    {
-                      text: `You are Mydobby, a gentle AI companion for overwhelmed people. Return valid JSON only in one of these schemas:\n\nNormal: {"heard":"string","matters_most":"string","action":{"text":"string","minutes":5,"why":"string"},"arrange_rest":["string"],"safety":"ok","record":{"summary":"string","themes":["string"]}}\nCrisis: {"safety":"crisis","message":"string","action":null,"arrange_rest":[],"record":null}\n\nRules:\n- Use a warm, grounded tone and keep advice tiny and realistic.\n- "heard" should reflect the felt burden in the user's own words.\n- "matters_most" should name the 1-2 highest-priority tasks that matter now.\n- "action.text" must be a single tiny next step.\n- Keep "minutes" practical and small.\n- If the user sounds unsafe or in crisis, set safety to "crisis" and provide a brief supportive message.\n- Do not include markdown or commentary outside the JSON.\n\nMind dump: ${mindDump}\nGoal: ${goal || "No formal goal yet"}\nAvailable time: ${time}\nEnergy: ${energy}`,
-                    },
-                  ],
-                },
+              model,
+              max_tokens: 500,
+              temperature: 0.7,
+              messages: [
+                { role: "system", content: systemPrompt },
+                { role: "user", content: userPrompt },
               ],
-              generationConfig: {
-                responseMimeType: "application/json",
-              },
+              response_format: { type: "json_object" },
             }),
-          },
-        );
+          });
 
-        if (!response.ok) {
-          continue;
-        }
-
-        const data = await response.json();
-        const content = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-        const parsed = parsePlanModelResponse(content);
-
-        if (parsed) {
-          return Response.json(parsed);
-        }
-      }
-
-      if (provider === "openai" && openAiKey) {
-        const response = await fetch("https://api.openai.com/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${openAiKey}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            model: "gpt-4o-mini",
-            temperature: 0.75,
-            messages: [
-              {
-                role: "system",
-                content:
-                  "You are Mydobby, a gentle AI companion for overwhelmed people. Output valid JSON only in one of these schemas: {\"heard\":\"string\",\"matters_most\":\"string\",\"action\":{\"text\":\"string\",\"minutes\":5,\"why\":\"string\"},\"arrange_rest\":[\"string\"],\"safety\":\"ok\",\"record\":{\"summary\":\"string\",\"themes\":[\"string\"]}} or {\"safety\":\"crisis\",\"message\":\"string\",\"action\":null,\"arrange_rest\":[],\"record\":null}. Keep the tone warm and grounded. Use very small practical actions. If the user sounds unsafe, output the crisis schema.",
-              },
-              {
-                role: "user",
-                content: `Mind dump: ${mindDump}\nGoal: ${goal || "No formal goal yet"}\nAvailable time: ${time}\nEnergy: ${energy}`,
-              },
-            ],
-            response_format: { type: "json_object" },
-          }),
-        });
-
-        if (!response.ok) {
-          continue;
-        }
-
-        const data = await response.json();
-        const content = data?.choices?.[0]?.message?.content;
-        const parsed = parsePlanModelResponse(content);
-
-        if (parsed) {
-          return Response.json(parsed);
-        }
-      }
-
-      if (provider === "groq" && groqKey) {
-        const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${groqKey}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            model: "openai/gpt-oss-120b",
-            temperature: 0.75,
-            messages: [
-              {
-                role: "system",
-                content:
-                  "You are Mydobby, a gentle AI companion for overwhelmed people. Output valid JSON only in one of these schemas: {\"heard\":\"string\",\"matters_most\":\"string\",\"action\":{\"text\":\"string\",\"minutes\":5,\"why\":\"string\"},\"arrange_rest\":[\"string\"],\"safety\":\"ok\",\"record\":{\"summary\":\"string\",\"themes\":[\"string\"]}} or {\"safety\":\"crisis\",\"message\":\"string\",\"action\":null,\"arrange_rest\":[],\"record\":null}. Keep the tone warm and grounded. Use very small practical actions. If the user sounds unsafe, output the crisis schema.",
-              },
-              {
-                role: "user",
-                content: `Mind dump: ${mindDump}\nGoal: ${goal || "No formal goal yet"}\nAvailable time: ${time}\nEnergy: ${energy}`,
-              },
-            ],
-            response_format: { type: "json_object" },
-          }),
-        });
-
-        if (!response.ok) {
-          continue;
-        }
-
-        const data = await response.json();
-        const content = data?.choices?.[0]?.message?.content;
-        const parsed = parsePlanModelResponse(content);
-
-        if (parsed) {
-          return Response.json(parsed);
+          if (groqResponse.ok) {
+            const groqData = await groqResponse.json();
+            const content = groqData?.choices?.[0]?.message?.content;
+            if (content) {
+              const parsed = JSON.parse(content);
+              if (parsed?.nextStep) {
+                return NextResponse.json({
+                  nextStep: parsed.nextStep.trim(),
+                  why: parsed.why?.trim() || "Designed to match your current capacity.",
+                  priority: parsed.priority?.trim() || (goal ? `Protect the ${goal} focus.` : "Anchor in what matters most today."),
+                  currentLoad: parsed.currentLoad?.trim() || "You are holding a lot and making room for clarity.",
+                  plan: parsed.plan?.trim() || `Spend ${time} calmly and stop before your energy drains.`,
+                  source: "groq",
+                  model,
+                });
+              }
+            }
+          }
+        } catch (e) {
+          console.warn(`Groq model ${model} failed, trying next`, e);
         }
       }
     }
-  } catch {
-    return Response.json({
-      ...demoPlanResponse,
-      nextStep: fallback.nextStep,
-      why: fallback.why,
-      priority: fallback.priority,
-      currentLoad: fallback.currentLoad,
-      plan: fallback.plan,
-      source: "demo",
-    });
-  }
 
-  return Response.json({
-    ...demoPlanResponse,
-    nextStep: fallback.nextStep,
-    why: fallback.why,
-    priority: fallback.priority,
-    currentLoad: fallback.currentLoad,
-    plan: fallback.plan,
-    source: "demo",
-  });
+    // Fallback if Groq key is absent or request fails
+    const fallback = buildFallbackPlan(mindDump, goal, time, energy);
+    return NextResponse.json({ ...fallback, source: "fallback" });
+  } catch (error) {
+    console.error("Error in plan route:", error);
+    const fallback = buildFallbackPlan("", "", "20 min", "medium");
+    return NextResponse.json({ ...fallback, source: "fallback" }, { status: 200 });
+  }
 }
 
 function buildFallbackPlan(mindDump: string, goal: string, time: string, energy: string) {
@@ -189,7 +99,7 @@ function buildFallbackPlan(mindDump: string, goal: string, time: string, energy:
     ? "You are carrying a lot: pressure, unfinished tasks, and the feeling that everything needs attention at once."
     : text.includes("tired") || text.includes("exhausted")
       ? "Your energy is stretched thin and your brain is asking for a lighter, clearer rhythm."
-      : "You are not doing nothing—you are holding many responsibilities and need a smaller frame to move through them.";
+      : "You are holding many thoughts and responsibilities; a smaller container will help you move forward.";
 
   const plan = cleanedGoal
     ? `Keep the work small: spend ${time.toLowerCase()} on the next real step toward ${cleanedGoal.toLowerCase()}, then stop before your ${energy} energy gets drained.`
@@ -225,30 +135,10 @@ function buildFallbackPlan(mindDump: string, goal: string, time: string, energy:
     };
   }
 
-  if (goal) {
+  if (cleanedGoal) {
     return {
-      nextStep: `Do the smallest visible action toward ${goal.toLowerCase()}: spend ${time.toLowerCase()} on the next real step.`,
+      nextStep: `Do the smallest visible action toward ${cleanedGoal.toLowerCase()}: spend ${time.toLowerCase()} on the next real step.`,
       why: `The goal is important, but the real win is making the next action small enough to complete with ${energy} energy.`,
-      priority,
-      currentLoad,
-      plan,
-    };
-  }
-
-  if (energy === "low") {
-    return {
-      nextStep: "Choose one tiny action that can be done gently and finish it before anything else.",
-      why: "A low-energy day still counts when the action is shaped to fit the day.",
-      priority,
-      currentLoad,
-      plan,
-    };
-  }
-
-  if (time === "10 min") {
-    return {
-      nextStep: "Pick one meaningful task, do it in a short focused block, and stop before your energy drains.",
-      why: "Short, clear actions are often more sustainable than longer ambitious plans.",
       priority,
       currentLoad,
       plan,

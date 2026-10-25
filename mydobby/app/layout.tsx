@@ -15,9 +15,17 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Mydobby",
   description: "A calm, pastel app for turning overwhelm into one meaningful next step and future-self reflection.",
+  openGraph: {
+    title: "Mydobby",
+    description: "A calm, pastel app for turning overwhelm into one meaningful next step and future-self reflection.",
+  },
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
     <html
       lang="en"

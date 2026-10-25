@@ -3,12 +3,12 @@ doc: scope
 status: approved
 ---
 
-# Kokoro (formerly Mydobby)
+# Kokoro (formerly Kokoro)
 
 A calm, pastel companion web app that transforms mental overwhelm into one kind, realistic next action and returns your progress as heartfelt future-self reflection letters delivered by interactive 3D animal messengers.
 
 ## The Unique Kernel
-Instead of another demanding productivity checklist or overwhelming to-do board, Mydobby acts as an anti-overwhelm container inspired by the Japanese philosophy of **Ikigai**. It takes an unedited stream of thoughts ("mind dump"), filters it through the user's *actual current energy* and *available time budget*, isolates **only ONE visible, doable next step**, and turns real completed steps into poignant letters from your future self delivered by 3D companions.
+Instead of another demanding productivity checklist or overwhelming to-do board, Kokoro acts as an anti-overwhelm container inspired by the Japanese philosophy of **Ikigai**. It takes an unedited stream of thoughts ("mind dump"), filters it through the user's *actual current energy* and *available time budget*, isolates **only ONE visible, doable next step**, and turns real completed steps into poignant letters from your future self delivered by 3D companions.
 
 ## Who It's For
 The overwhelmed knowledge worker, student, developer, or creator who is staring at a paralyzing mountain of tasks, feeling behind, and exhausted. Today they either freeze, doomscroll, or open complex project management tools (Notion, Jira, Todoist) that only heighten their guilt.

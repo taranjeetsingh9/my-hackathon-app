@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# Mydobby - Local Test & Development Server Launcher
+# Kokoro - Local Test & Development Server Launcher
 # Build With AI: Basics Hackathon
 # ==============================================================================
 
@@ -15,14 +15,14 @@ RESET='\033[0m'
 BOLD='\033[1m'
 
 echo -e "${PURPLE}==================================================================${RESET}"
-echo -e "${BOLD}${CYAN}   🌸  Mydobby — Build With AI: Basics Hackathon  🌸${RESET}"
+echo -e "${BOLD}${CYAN}   🌸  Kokoro — Build With AI: Basics Hackathon  🌸${RESET}"
 echo -e "${PURPLE}==================================================================${RESET}"
 echo ""
 
 # 1. Check Node.js version
 echo -e "${CYAN}▶ Checking Node.js environment...${RESET}"
 if ! command -v node &> /dev/null; then
-    echo -e "${YELLOW}✗ Error: Node.js is not installed. Please install Node.js (v18+) to run Mydobby.${RESET}"
+    echo -e "${YELLOW}✗ Error: Node.js is not installed. Please install Node.js (v18+) to run Kokoro.${RESET}"
     exit 1
 fi
 

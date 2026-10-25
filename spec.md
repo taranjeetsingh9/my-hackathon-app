@@ -3,7 +3,7 @@ doc: spec
 status: approved
 ---
 
-# Kokoro (formerly Mydobby) — Technical Specification
+# Kokoro (formerly Kokoro) — Technical Specification
 
 ## How This Works, In Plain Language
 Kokoro is a full-stack Next.js web application built around an emotional, low-friction user loop:

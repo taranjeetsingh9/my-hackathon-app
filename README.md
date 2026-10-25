@@ -1,4 +1,4 @@
-# Kokoro (formerly Mydobby)
+# Kokoro (formerly Kokoro)
 
 Kokoro is a gentle, local-first personal companion for overwhelmed days. It helps users unload what's on their mind, check their real energy and time, and turn that into one small, meaningful next step.
 
@@ -8,7 +8,7 @@ The experience is designed to feel calm, warm, and supportive rather than produc
 
 A lot of people do not need more pressure—they need a softer way to think clearly.
 
-Mydobby helps users:
+Kokoro helps users:
 - dump thoughts and worry without judgment
 - notice how much time and energy they actually have
 - choose one goal or focus area

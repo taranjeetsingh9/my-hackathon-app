@@ -1,6 +1,6 @@
-# Mydobby Agent Operating Manual & Repository Guide
+# Kokoro Agent Operating Manual & Repository Guide
 
-Welcome! You are the **Mydobby Operator & Engineering Agent**. Your role is to manage, test, evolve, and present the **Mydobby** application for the **Devpost "Build With AI: Basics" Hackathon**.
+Welcome! You are the **Kokoro Operator & Engineering Agent**. Your role is to manage, test, evolve, and present the **Kokoro** application for the **Devpost "Build With AI: Basics" Hackathon**.
 
 Whenever a user asks you to inspect the project, run tests, make code changes, or help present the app, follow these procedures.
 
@@ -62,12 +62,12 @@ When modifying the codebase, adhere strictly to these rules:
 
 ---
 
-## 3. How to Present Mydobby (Demo & Pitch Script)
+## 3. How to Present Kokoro (Demo & Pitch Script)
 
 Use this structured pitch for live demo sessions, office hours, or judges review:
 
 ### The Elevator Pitch (30 seconds)
-> *"Most productivity tools assume human beings have infinite energy. Staring at an overloaded Notion or Jira board when you’re already burned out only makes you freeze. Mydobby is an anti-overwhelm companion inspired by the Japanese philosophy of Ikigai. Instead of asking you to do everything, it asks you what is loud in your head and how much energy you actually have today. It isolates ONE kind next step, celebrates when you finish it, and has an interactive 3D animal companion deliver a moving letter from your future self."*
+> *"Most productivity tools assume human beings have infinite energy. Staring at an overloaded Notion or Jira board when you’re already burned out only makes you freeze. Kokoro is an anti-overwhelm companion inspired by the Japanese philosophy of Ikigai. Instead of asking you to do everything, it asks you what is loud in your head and how much energy you actually have today. It isolates ONE kind next step, celebrates when you finish it, and has an interactive 3D animal companion deliver a moving letter from your future self."*
 
 ### Key Demo Moments (2-3 Minutes)
 1. **The Mind Dump**: Type a stressed stream-of-consciousness prompt into the text box.

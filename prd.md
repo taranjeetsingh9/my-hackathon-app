@@ -3,7 +3,7 @@ doc: prd
 status: approved
 ---
 
-# Kokoro (formerly Mydobby) — Product Requirements Document
+# Kokoro (formerly Kokoro) — Product Requirements Document
 
 Kokoro is a calm, pastel web app that helps overwhelmed people convert chaotic thoughts into one realistic next action and reflect upon their personal growth through future-self letters and 3D messengers.
 
@@ -16,7 +16,7 @@ Source: `scope.md > The Unique Kernel`, `scope.md > Who It's For`.
 4. **Anchor Goal (Optional)**: User can enter an overarching goal or choose to skip without judgment.
 5. **Small Step Recommendation**: AI filters the inputs to generate exactly ONE high-impact, realistic next step, along with an empathetic explanation of priority, current emotional load, and container plan.
 6. **Action Resolution**: User returns and records their outcome ("I did it", "Partially", "Changed plan", "Skip for now"). Confetti provides micro-celebration.
-7. **Letter Ceremony**: User triggers milestone or monthly future-self letters written by Mydobby's reflective AI engine, styled in a parchment wax-sealed modal.
+7. **Letter Ceremony**: User triggers milestone or monthly future-self letters written by Kokoro's reflective AI engine, styled in a parchment wax-sealed modal.
 8. **Sanctuary & 3D Companion**: User explores their chosen animal companion (Owl, Raven, Phoenix, Fox, Hummingbird) in a responsive real-time 3D orbit environment.
 9. **Account & Cloud Persistence**: User creates an account or logs in with Supabase to sync their profile, check-ins, and letters with strict Row Level Security.
 

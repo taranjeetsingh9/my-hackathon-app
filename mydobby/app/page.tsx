@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import confetti from "canvas-confetti";
 import Messenger3D, { MessengerType } from "./components/Messenger3D";
+import { supabase } from "../lib/supabase";
+import type { User } from "@supabase/supabase-js";
 
 type TimeOption = "10 min" | "20 min" | "45 min" | "1 hour+";
 type EnergyLevel = "low" | "medium" | "high";
@@ -135,6 +137,103 @@ export default function Home() {
     plan?: string;
     source?: string;
   } | null>(null);
+
+  // Supabase Auth & Connection state
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
+  const [authMode, setAuthMode] = useState<"signin" | "signup">("signin");
+  const [authEmail, setAuthEmail] = useState("");
+  const [authPassword, setAuthPassword] = useState("");
+  const [authLoading, setAuthLoading] = useState(false);
+  const [authNotice, setAuthNotice] = useState<{ text: string; error?: boolean } | null>(null);
+  const [isTestingSupabase, setIsTestingSupabase] = useState(false);
+  const [supabaseStatus, setSupabaseStatus] = useState<{
+    status: string;
+    message: string;
+    details?: { url?: string; keyPrefix?: string; sessionActive?: boolean; authReachable?: boolean; error?: string };
+  } | null>(null);
+
+  useEffect(() => {
+    if (!supabase) return;
+    supabase.auth.getUser().then(({ data }) => {
+      setUser(data.user ?? null);
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  const checkSupabaseConnection = async () => {
+    setIsTestingSupabase(true);
+    setAuthNotice(null);
+    try {
+      const res = await fetch("/api/test-supabase");
+      const data = await res.json();
+      setSupabaseStatus(data);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setSupabaseStatus({
+        status: "failed",
+        message: "Connection request failed: " + msg,
+      });
+    } finally {
+      setIsTestingSupabase(false);
+    }
+  };
+
+  const handleAuthSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!supabase) {
+      setAuthNotice({
+        text: "Supabase client not initialized. Please verify NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY in .env.local",
+        error: true,
+      });
+      return;
+    }
+    if (!authEmail || !authPassword) {
+      setAuthNotice({ text: "Please enter both email and password.", error: true });
+      return;
+    }
+
+    setAuthLoading(true);
+    setAuthNotice(null);
+    try {
+      if (authMode === "signup") {
+        const { data, error } = await supabase.auth.signUp({
+          email: authEmail,
+          password: authPassword,
+        });
+        if (error) throw error;
+        if (data.user && !data.session) {
+          setAuthNotice({ text: "Account created! Please check your email to confirm registration." });
+        } else {
+          setAuthNotice({ text: "Signed up and logged in successfully!" });
+        }
+      } else {
+        const { error } = await supabase.auth.signInWithPassword({
+          email: authEmail,
+          password: authPassword,
+        });
+        if (error) throw error;
+        setAuthNotice({ text: "Logged in successfully!" });
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setAuthNotice({ text: msg, error: true });
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const handleSignOut = async () => {
+    if (!supabase) return;
+    await supabase.auth.signOut();
+    setUser(null);
+    setAuthNotice({ text: "Logged out. You are now using Guest Mode (Local storage)." });
+  };
 
   useEffect(() => {
     const saved = window.localStorage.getItem("mydobby-state");
@@ -785,6 +884,27 @@ export default function Home() {
           </div>
           <div className="flex items-center gap-2">
             <button
+              onClick={() => {
+                setShowAuthModal(true);
+                if (!supabaseStatus) {
+                  checkSupabaseConnection();
+                }
+              }}
+              className="flex items-center gap-1.5 rounded-full border border-[#eadff8] bg-white px-3.5 py-1.5 text-xs font-medium text-[#443d59] shadow-xs hover:bg-[#faf6ff]"
+              title="Supabase connection status and authentication"
+            >
+              <span>{user ? "👤 Account" : "☁️ Cloud / Login"}</span>
+              <span
+                className={`h-2 w-2 rounded-full ${
+                  supabaseStatus?.status === "connected"
+                    ? "bg-emerald-500"
+                    : supabaseStatus?.status === "missing_credentials"
+                    ? "bg-amber-400"
+                    : "bg-purple-300"
+                }`}
+              ></span>
+            </button>
+            <button
               onClick={() => setScreen("sanctuary")}
               className={`rounded-full border px-3.5 py-1.5 text-xs font-medium transition ${
                 screen === "sanctuary"
@@ -878,6 +998,201 @@ export default function Home() {
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Supabase Cloud & Account Modal */}
+      {showAuthModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4 backdrop-blur-sm animate-fade-in">
+          <div className="relative w-full max-w-lg rounded-[32px] border border-white/90 bg-white/95 p-6 shadow-[0_25px_80px_rgba(100,80,130,0.2)] md:p-8">
+            <div className="mb-6 flex items-center justify-between border-b border-[#f0e8f8] pb-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#f0e6ff] text-xl">
+                  ☁️
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-[#2f2a36]">Supabase Cloud & Account</h3>
+                  <p className="text-xs text-[#786b88]">Status, connection test & authentication</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowAuthModal(false)}
+                className="flex h-8 w-8 items-center justify-center rounded-full border border-[#eadff8] bg-white text-xs text-[#5a4d6e] hover:bg-[#faf6ff]"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Supabase Connection Test Card */}
+            <div className="mb-6 rounded-2xl border border-[#ece4f5] bg-[#faf7fc] p-4">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold uppercase tracking-wider text-[#6a5b7d]">
+                  Supabase Backend Status
+                </span>
+                <button
+                  onClick={checkSupabaseConnection}
+                  disabled={isTestingSupabase}
+                  className="rounded-full border border-[#dcd0ec] bg-white px-2.5 py-1 text-xs text-[#584572] transition hover:bg-[#f5eefc] disabled:opacity-60"
+                >
+                  {isTestingSupabase ? "Testing..." : "↻ Test Connection"}
+                </button>
+              </div>
+
+              <div className="mt-2.5">
+                {isTestingSupabase ? (
+                  <p className="text-xs text-[#776c85]">Pinging Supabase endpoints...</p>
+                ) : supabaseStatus?.status === "connected" ? (
+                  <div className="rounded-xl border border-emerald-200 bg-emerald-50/80 p-3">
+                    <div className="flex items-center gap-2 text-xs font-medium text-emerald-800">
+                      <span className="h-2 w-2 rounded-full bg-emerald-500"></span>
+                      <span>Connected Successfully!</span>
+                    </div>
+                    <p className="mt-1 text-[11px] text-emerald-700">
+                      Project URL: <span className="font-mono">{supabaseStatus.details?.url}</span>
+                    </p>
+                    <p className="text-[11px] text-emerald-700">
+                      Auth Service: <span className="font-medium">Online & Reachable</span>
+                    </p>
+                  </div>
+                ) : supabaseStatus?.status === "missing_credentials" ? (
+                  <div className="rounded-xl border border-amber-200 bg-amber-50/90 p-3 text-xs text-amber-900">
+                    <p className="font-medium">⚠️ Credentials not found in local environment</p>
+                    <p className="mt-1 text-[11px] leading-relaxed text-amber-800">
+                      Ensure <code className="rounded bg-amber-100 px-1 font-mono">NEXT_PUBLIC_SUPABASE_URL</code> and{" "}
+                      <code className="rounded bg-amber-100 px-1 font-mono">NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY</code> are saved in your <code className="font-mono">.env.local</code> file and restart the dev server.
+                    </p>
+                  </div>
+                ) : supabaseStatus ? (
+                  <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800">
+                    <p className="font-medium">Connection Notice</p>
+                    <p className="mt-1 text-[11px]">{supabaseStatus.message}</p>
+                  </div>
+                ) : (
+                  <p className="text-xs text-[#776c85]">Click &ldquo;Test Connection&rdquo; to test your Supabase setup.</p>
+                )}
+              </div>
+            </div>
+
+            {/* Account / Auth State */}
+            {user ? (
+              <div className="rounded-2xl border border-purple-100 bg-[#fbf9fe] p-5">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#e9dcff] text-lg">
+                    ✨
+                  </div>
+                  <div>
+                    <p className="text-xs text-[#7e6f92]">Signed in to Mydobby as</p>
+                    <p className="text-sm font-semibold text-[#2f273b]">{user.email}</p>
+                  </div>
+                </div>
+
+                <div className="mt-4 rounded-xl bg-white p-3 text-xs text-[#5f5370]">
+                  <p>✓ Cloud sync ready</p>
+                  <p className="mt-1 text-[11px] text-[#7f7391]">
+                    Your reflections and future-self letters are tied to this account.
+                  </p>
+                </div>
+
+                <div className="mt-5 flex justify-end">
+                  <button
+                    onClick={handleSignOut}
+                    className="rounded-full border border-[#eadff8] bg-white px-4 py-1.5 text-xs font-medium text-[#7d3b3b] hover:bg-rose-50"
+                  >
+                    Log Out
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div>
+                <div className="mb-4 rounded-xl border border-[#eadff8] bg-[#fbf9fe] p-3 text-xs leading-relaxed text-[#5e5370]">
+                  <p className="font-medium text-[#3b3248]">🌱 Guest Mode Active</p>
+                  <p className="mt-1 text-[11px] text-[#736685]">
+                    Mydobby does not force logins. Your thoughts and letters are safely saved in your browser&apos;s storage right now. If you want to backup across devices, you can log in or create a Supabase account below.
+                  </p>
+                </div>
+
+                {/* Tab switch */}
+                <div className="mb-4 flex rounded-full bg-[#f1e9f8] p-1 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAuthMode("signin");
+                      setAuthNotice(null);
+                    }}
+                    className={`flex-1 rounded-full py-1.5 text-center font-medium transition ${
+                      authMode === "signin"
+                        ? "bg-white text-[#342b42] shadow-xs"
+                        : "text-[#6c5e80] hover:text-[#342b42]"
+                    }`}
+                  >
+                    Sign In
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAuthMode("signup");
+                      setAuthNotice(null);
+                    }}
+                    className={`flex-1 rounded-full py-1.5 text-center font-medium transition ${
+                      authMode === "signup"
+                        ? "bg-white text-[#342b42] shadow-xs"
+                        : "text-[#6c5e80] hover:text-[#342b42]"
+                    }`}
+                  >
+                    Create Account
+                  </button>
+                </div>
+
+                {/* Form */}
+                <form onSubmit={handleAuthSubmit} className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-medium text-[#4f4362]">Email</label>
+                    <input
+                      type="email"
+                      value={authEmail}
+                      onChange={(e) => setAuthEmail(e.target.value)}
+                      placeholder="you@example.com"
+                      className="mt-1 w-full rounded-xl border border-[#e1d5ef] bg-white px-3.5 py-2 text-xs text-[#2f273b] outline-none focus:border-[#a589cf] focus:ring-1 focus:ring-[#a589cf]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-[#4f4362]">Password</label>
+                    <input
+                      type="password"
+                      value={authPassword}
+                      onChange={(e) => setAuthPassword(e.target.value)}
+                      placeholder="••••••••"
+                      className="mt-1 w-full rounded-xl border border-[#e1d5ef] bg-white px-3.5 py-2 text-xs text-[#2f273b] outline-none focus:border-[#a589cf] focus:ring-1 focus:ring-[#a589cf]"
+                    />
+                  </div>
+
+                  {authNotice && (
+                    <div
+                      className={`rounded-xl p-2.5 text-xs ${
+                        authNotice.error
+                          ? "border border-rose-200 bg-rose-50 text-rose-800"
+                          : "border border-emerald-200 bg-emerald-50 text-emerald-800"
+                      }`}
+                    >
+                      {authNotice.text}
+                    </div>
+                  )}
+
+                  <button
+                    type="submit"
+                    disabled={authLoading}
+                    className="mt-2 w-full rounded-xl bg-[#6d5494] py-2.5 text-xs font-medium text-white shadow-sm transition hover:bg-[#5b4382] disabled:opacity-60"
+                  >
+                    {authLoading
+                      ? "Processing..."
+                      : authMode === "signin"
+                      ? "Sign In"
+                      : "Create Account"}
+                  </button>
+                </form>
+              </div>
+            )}
           </div>
         </div>
       )}
